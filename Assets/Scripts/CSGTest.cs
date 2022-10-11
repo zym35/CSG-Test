@@ -19,6 +19,7 @@ public class CSGTest : MonoBehaviour
         var result = new GameObject(name);
         result.AddComponent<MeshFilter>().sharedMesh = model.mesh;
         result.AddComponent<MeshRenderer>().sharedMaterials = model.materials.ToArray();
+        result.AddComponent<MeshCollider>();
         result.AddComponent<CSGTest>();
     }
 }

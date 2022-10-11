@@ -6,29 +6,33 @@ using UnityEngine;
 public class Rubber : MonoBehaviour
 {
     public bool active;
-    public float step;
+    public float distThreshold;
     public Transform lightSource;
     public GameObject cuttingObject;
 
-    private float _stepTimer;
+    private Vector3 _lastPos;
 
     private void Start()
     {
         var lightAngles = lightSource.eulerAngles;
         cuttingObject.transform.eulerAngles = 
             new Vector3(lightAngles.x - 90, lightAngles.y, 0);
+
+        _lastPos = transform.position;
     }
 
     private void Update()
     {
+        //Ray ray = new Ray(transform.position, transform.up)
+        active = Physics.Raycast(transform.position, cuttingObject.transform.up, 100);
+
         if (!active)
             return;
-        
-        _stepTimer += Time.deltaTime;
-        if (_stepTimer >= step)
+
+        if (Vector3.Distance(transform.position, _lastPos) > distThreshold)
         {
+            _lastPos = transform.position;
             Perform();
-            _stepTimer = 0;
         }
     }
 
@@ -45,6 +49,6 @@ public class Rubber : MonoBehaviour
 
     private void CreateCuttingObject()
     {
-        
+        // TODO: generate mesh dynamically based on rubber movement direction and smooth
     }
 }
