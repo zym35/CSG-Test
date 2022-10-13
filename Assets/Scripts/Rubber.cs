@@ -5,39 +5,44 @@ using UnityEngine;
 
 public class Rubber : MonoBehaviour
 {
-    public bool active;
+    public bool debug;
     public float distThreshold;
     public Transform lightSource;
     public GameObject cuttingObject;
+    public GameObject debugCuttingObject;
     public float width;
     public Transform debug0, debug1, debug2, debug3;
 
     private Vector3 _lastPos;
     private Vector3 _vLastLeft;
     private Vector3 _vLastRight;
+    private Vector3 _lightVec;
+
+    private MeshFilter _cuttingMeshFilter;
+    private MeshRenderer _cuttingMeshRenderer;
+
+    private const float CUT_LENGTH = 4;
 
     private void Start()
     {
-        var lightAngles = lightSource.eulerAngles;
-        cuttingObject.transform.eulerAngles =
-            new Vector3(lightAngles.x - 90, lightAngles.y, 0);
-
         _lastPos = transform.position;
         _vLastLeft = Vector3.zero;
         _vLastRight = Vector3.zero;
+
+        _cuttingMeshFilter = cuttingObject.GetComponent<MeshFilter>();
+        _cuttingMeshRenderer = cuttingObject.GetComponent<MeshRenderer>();
     }
 
     private void Update()
     {
-        //Ray ray = new Ray(transform.position, transform.up)
-        active = Physics.Raycast(transform.position, cuttingObject.transform.up, 100);
-
-        //if (!active) return;
-
         if (Vector3.Distance(transform.position, _lastPos) > distThreshold)
         {
-            //Perform();
-            CreateCuttingObject();
+            if (Physics.Raycast(transform.position, lightSource.position - transform.position, CUT_LENGTH))
+            {
+                CreateCuttingObject();
+                Perform();
+            }
+            
             _lastPos = transform.position;
         }
     }
@@ -47,20 +52,23 @@ public class Rubber : MonoBehaviour
         var objs = FindObjectsOfType<CSGTest>();
         foreach (var csgTest in objs)
         {
-            cuttingObject.GetComponent<MeshRenderer>().sharedMaterial =
-                csgTest.GetComponent<MeshRenderer>().sharedMaterial;
-            csgTest.Perform(cuttingObject);
+            //_cuttingMeshRenderer.sharedMaterial = 
+                //csgTest.GetComponent<MeshRenderer>().sharedMaterial;
+            
+            if (debug)
+                csgTest.Perform(debugCuttingObject);
+            else 
+                csgTest.Perform(cuttingObject);
         }
     }
-
+    
     private void CreateCuttingObject()
     {
         Vector3 pos = transform.position;
         Vector3 forward = pos - _lastPos;
         Vector3 dirLeft = Vector3.Cross(Vector3.up, forward).normalized;
-        Vector3 lightAngles = lightSource.eulerAngles;
-        Vector3 lightDir = new Vector3(lightAngles.x - 90, lightAngles.y, 0).normalized;
 
+        // calc vertex positions
         Vector3 vLeft = pos + dirLeft * width / 2f;
         Vector3 vRight = pos - dirLeft * width / 2f;
         if (_vLastLeft == Vector3.zero)
@@ -69,17 +77,59 @@ public class Rubber : MonoBehaviour
             _vLastRight = _lastPos - dirLeft * width / 2f;
         }
 
-        debug0.position = _vLastLeft + lightDir * 2;
-        debug1.position = _vLastRight + lightDir * 2;
-        debug2.position = vLeft + lightDir * 2;
-        debug3.position = vRight + lightDir * 2;
-
-        Vector3[] vertices =
-        {
-            _vLastLeft, vLeft, vRight, _vLastRight
+        // create mesh
+        List<Vector3> vertexList = new (){
+            _vLastLeft, vLeft, vRight, _vLastRight,
+            CalculateFarVertex(_vLastLeft), CalculateFarVertex(vLeft),
+            CalculateFarVertex(vRight), CalculateFarVertex(_vLastRight)
         };
 
+        List<Vector3> vertices = new ();
+        List<int> tris = new ();
+        List<Vector3> normals = new ();
+
+        int[] triangleIndexes = {
+            0, 3, 4, 7, 4, 3,
+            3, 2, 7, 2, 6, 7,
+            2, 1, 6, 1, 5, 6,
+            1, 0, 5, 0, 4, 5,
+            4, 6, 5, 4, 7, 6,
+            0, 1, 2, 0, 2, 3
+        };
+        for (int i = 0; i <= 33; i += 3)
+            AddTriangle(triangleIndexes[i], triangleIndexes[i+1], triangleIndexes[i+2]);
+        
+        var mesh = new Mesh();
+        mesh.SetVertices(vertices);
+        mesh.SetTriangles(tris, 0);
+        mesh.SetNormals(normals);
+        
+        _cuttingMeshFilter.sharedMesh = mesh;
+        
+        void AddTriangle(int v0, int v1, int v2)
+        {
+            vertices.Add(vertexList[v0]);
+            tris.Add(vertices.Count - 1);
+            vertices.Add(vertexList[v1]);
+            tris.Add(vertices.Count - 1);
+            vertices.Add(vertexList[v2]);
+            tris.Add(vertices.Count - 1);
+
+            var normal = Vector3.Cross(
+                vertexList[v1] - vertexList[v0], vertexList[v2] - vertexList[v0]);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+        }
+        
         _vLastLeft = vLeft;
         _vLastRight = vRight;
     }
+
+    private Vector3 CalculateFarVertex(Vector3 nearVert)
+    {
+        var lightVec = (lightSource.position - nearVert).normalized * CUT_LENGTH;
+        return nearVert + lightVec;
+    }
+    
 }
