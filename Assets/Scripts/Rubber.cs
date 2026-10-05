@@ -21,7 +21,7 @@ public class Rubber : MonoBehaviour
     private MeshFilter _cuttingMeshFilter;
     private MeshRenderer _cuttingMeshRenderer;
 
-    private const float CUT_LENGTH = 4;
+    private const float CUT_LENGTH = 10;
 
     private void Start()
     {
